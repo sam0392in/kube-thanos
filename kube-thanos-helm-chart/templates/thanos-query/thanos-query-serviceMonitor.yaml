@@ -1,0 +1,24 @@
+{{- if .Values.query.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: thanos-query
+    app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-query"
+    {{- include "thanos.commonlabels" . | nindent 4 }}
+  name: "{{- include "thanos.fullname" . }}-query"
+spec:
+  endpoints:
+  - port: http
+    relabelings:
+    - separator: /
+      sourceLabels:
+      - namespace
+      - pod
+      targetLabel: instance
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: thanos-query
+      app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-query"
+{{- end }}
+

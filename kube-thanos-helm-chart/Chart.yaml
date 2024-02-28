@@ -1,0 +1,17 @@
+apiVersion: v1
+appVersion: v0.31.0
+description: Open source, highly available Prometheus setup with long term storage capabilities.
+home: https://thanos.io/
+icon: https://thanos.io/icon-dark.png
+keywords:
+  - analytics
+  - monitoring
+  - prometheus
+  - thanos
+maintainers:
+  - name: Samarth Kanungo
+    url: https://github.com/sam0392in/kube-thanos-unofficial-helm-chart
+name: thanos
+sources:
+  - https://github.com/thanos-io/kube-thanos/tree/main/manifests
+version: v0.31.0

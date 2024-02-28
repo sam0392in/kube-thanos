@@ -1,0 +1,103 @@
+{{- if .Values.compactor.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/component: thanos-compactor
+    app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-compactor"
+    {{- include "thanos.commonlabels" . | nindent 4 }}
+  name: "{{- include "thanos.fullname" . }}-compactor"
+spec:
+  replicas: {{ .Values.compactor.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: thanos-compactor
+      app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-compactor"
+  serviceName: "{{- include "thanos.fullname" . }}-compactor"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: thanos-compactor
+        app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-compactor"
+        {{- include "thanos.commonlabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.compactor.affinity }}
+      affinity: 
+      {{- .Values.compactor.affinity | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if .Values.compactor.tolerations }}
+      tolerations: 
+      {{- .Values.compactor.tolerations | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if .Values.compactor.topologySpreadConstraints }}
+      topologySpreadConstraints:
+      {{- .Values.compactor.topologySpreadConstraints | toYaml | nindent 8 }}
+      {{- end }}
+      containers:
+      - args:
+        {{- range $key, $value := .Values.compactor.args }}
+        - {{ $value }}
+        {{- end }}
+        - |-
+          --tracing.config="config":
+            "sampler_param": 2
+            "sampler_type": "ratelimiting"
+            "service_name": "thanos-system-metrics-compact"
+          "type": "JAEGER"
+        env:
+        - name: OBJSTORE_CONFIG
+          valueFrom:
+            secretKeyRef:
+              key: {{ .Values.global.S3Config.key }}
+              name: {{ .Values.global.S3Config.name }}
+        - name: HOST_IP_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        image: "{{ .Values.global.image.repository }}:{{ .Chart.AppVersion }}"
+        livenessProbe:
+          failureThreshold: 4
+          httpGet:
+            path: /-/healthy
+            port: 10902
+            scheme: HTTP
+          periodSeconds: 30
+        name: "{{- include "thanos.fullname" . }}-compactor"
+        ports:
+        - containerPort: 10902
+          name: http
+        readinessProbe:
+          failureThreshold: 20
+          httpGet:
+            path: /-/ready
+            port: 10902
+            scheme: HTTP
+          periodSeconds: 5
+        resources:
+        {{- .Values.compactor.resources | toYaml | nindent 10 }}
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /var/thanos/compact
+          name: data
+          readOnly: false
+      securityContext:
+        fsGroup: 65534
+        runAsUser: 65534
+      serviceAccountName: "{{- include "thanos.fullname" . }}-compactor"
+      terminationGracePeriodSeconds: 120
+      volumes: []
+  volumeClaimTemplates:
+  - metadata:
+      labels:
+        app.kubernetes.io/component: thanos-compactor
+        app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-compactor"
+        {{- include "thanos.commonlabels" . | nindent 8 }}
+      name: data
+    spec:
+      accessModes:
+      - {{ .Values.compactor.storage.accessMode }}
+      resources:
+        requests:
+          storage: "{{ .Values.compactor.storage.size }}"
+{{- end }}
+        

@@ -1,0 +1,23 @@
+{{- if .Values.compactor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: thanos-compactor
+    app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-compactor"
+    {{- include "thanos.commonlabels" . | nindent 4 }}
+  name: "{{- include "thanos.fullname" . }}-compactor"
+spec:
+  endpoints:
+  - port: http
+    relabelings:
+    - separator: /
+      sourceLabels:
+      - namespace
+      - pod
+      targetLabel: instance
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: thanos-compactor
+      app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-compactor"
+{{- end }}

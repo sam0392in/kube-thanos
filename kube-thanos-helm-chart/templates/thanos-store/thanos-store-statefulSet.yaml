@@ -1,0 +1,113 @@
+{{- if .Values.store.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/component: thanos-store
+    app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-store"
+    {{- include "thanos.commonlabels" . | nindent 4 }}
+  name: "{{- include "thanos.fullname" . }}-store"
+spec:
+  replicas: {{ .Values.store.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: thanos-store
+      app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-store"
+  serviceName: "{{- include "thanos.fullname" . }}-store"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: thanos-store
+        app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-store"
+        {{- include "thanos.commonlabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.store.affinity }}
+      affinity: 
+      {{- .Values.store.affinity | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if .Values.store.tolerations }}
+      tolerations: 
+      {{- .Values.store.tolerations | toYaml | nindent 8 }}
+      {{- end }}
+      {{- if .Values.store.topologySpreadConstraints }}
+      topologySpreadConstraints:
+      {{- .Values.store.topologySpreadConstraints | toYaml | nindent 8 }}
+      {{- end }}
+      containers:
+      {{- if .Values.store.garbageCollector.enabled }}
+      - name: thanos-garbage-collector
+        image: {{ .Values.store.garbageCollector.image }}
+        env:
+          - name: THANOS_DATA_DIR
+            value: "{{ .Values.store.garbageCollector.env.thanosDataDirectory }}"
+          - name: CLEANUP_FREQUENCY
+            value: "{{ .Values.store.garbageCollector.env.cleanupFrequency }}"
+          - name: RETENTION_PERIOD
+            value: "{{ .Values.store.garbageCollector.env.retentionPeriod }}"
+        volumeMounts:
+          - mountPath: /var/thanos/store
+            name: data
+            readOnly: false
+      {{- end }}
+      - name: "{{- include "thanos.fullname" . }}-store"
+        args:
+        {{- range $key, $value := .Values.store.args }}
+        - {{ $value }}
+        {{- end }}
+        env:
+        - name: OBJSTORE_CONFIG
+          valueFrom:
+            secretKeyRef:
+              key: {{ .Values.global.S3Config.key }}
+              name: {{ .Values.global.S3Config.name }}
+        - name: HOST_IP_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        image: "{{ .Values.global.image.repository }}:{{ .Chart.AppVersion }}"
+        livenessProbe:
+          failureThreshold: 8
+          httpGet:
+            path: /-/healthy
+            port: 10902
+            scheme: HTTP
+          periodSeconds: 30
+        ports:
+        - containerPort: 10901
+          name: grpc
+        - containerPort: 10902
+          name: http
+        readinessProbe:
+          failureThreshold: 20
+          httpGet:
+            path: /-/ready
+            port: 10902
+            scheme: HTTP
+          periodSeconds: 5
+        resources:
+        {{- .Values.store.resources | toYaml | nindent 10 }}
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /var/thanos/store
+          name: data
+          readOnly: false
+      securityContext:
+        fsGroup: 65534
+        runAsUser: 65534
+      serviceAccountName: "{{- include "thanos.fullname" . }}-store"
+      terminationGracePeriodSeconds: 120
+      volumes: []
+  volumeClaimTemplates:
+  - metadata:
+      labels:
+        app.kubernetes.io/component: thanos-store
+        app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-store"
+        {{- include "thanos.commonlabels" . | nindent 8 }}
+      name: data
+    spec:
+      accessModes:
+      - {{ .Values.store.storage.accessMode }}
+      resources:
+        requests:
+          storage: "{{ .Values.store.storage.size }}"
+{{- end }}

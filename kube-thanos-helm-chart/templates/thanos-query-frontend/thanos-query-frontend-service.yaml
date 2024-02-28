@@ -1,0 +1,18 @@
+{{- if .Values.queryfrontend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: thanos-queryfrontend
+    app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-queryfrontend"
+    {{- include "thanos.commonlabels" . | nindent 4 }}
+  name: "{{- include "thanos.fullname" . }}-queryfrontend"
+spec:
+  ports:
+  - name: http
+    port: 9090
+    targetPort: 9090
+  selector:
+    app.kubernetes.io/component: thanos-queryfrontend
+    app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-queryfrontend"
+{{- end }}

@@ -1,0 +1,24 @@
+{{- if and .Values.query.enabled .Values.query.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    {{- .Values.query.ingress.annotations | toYaml | nindent 4 }}
+  labels:
+    app.kubernetes.io/component: thanos-query
+    app.kubernetes.io/name: "{{- include "thanos.fullname" . }}-query"
+    {{- include "thanos.commonlabels" . | nindent 4 }}
+  name: "{{- include "thanos.fullname" . }}-query"
+spec:
+  ingressClassName: {{ .Values.query.ingress.ingressClass }}
+  rules:
+  - host: {{ .Values.query.ingress.host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: "{{- include "thanos.fullname" . }}-query"
+            port:
+              number: 9090
+        pathType: {{ .Values.query.ingress.pathType }}
+{{- end }}

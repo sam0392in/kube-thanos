@@ -1,0 +1,9 @@
+type: s3
+config:
+  bucket: "thanos-s3"
+  endpoint: "s3.eu-west-1.amazonaws.com"
+  region: "eu-west-1"
+  insecure: false
+  signature_version2: false
+  trace:
+    enable: true

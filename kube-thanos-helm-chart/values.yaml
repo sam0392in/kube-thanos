@@ -1,0 +1,342 @@
+global:
+  fullNameOverride: "thanos"
+  image:
+    repository: "quay.io/thanos/thanos"
+    imagePullPolicy: IfNotPresent
+  
+  S3Config:
+    key: thanos-s3-config.yaml
+    name: thanos-s3-config
+
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::1122334455:role/k8s-prometheus-thanos
+    
+#--------------------------------#  
+query:
+  enabled: true
+
+  replicas: 3
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node
+                operator: In
+                values:
+                  - monitoring
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: node
+                operator: In
+                values:
+                  - monitoring
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - thanos-query
+          namespaces:
+          - monitoring
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+
+  topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: thanos-query
+    # matchLabelKeys is enabled from K8S 1.27    
+    # matchLabelKeys:
+    #   - pod-template-hash
+
+  tolerations:
+  - effect: NoSchedule
+    key: node
+    operator: Equal
+    value: monitoring
+
+  args:
+  - query
+  - --grpc-address=0.0.0.0:10901
+  - --http-address=0.0.0.0:9090
+  - --log.level=info
+  - --log.format=logfmt
+  - --query.replica-label=prometheus_replica
+  - --query.replica-label=rule_replica
+  - --store=dnssrv+_grpc._tcp.prometheus-svc.monitoring:10901
+  # - --store=dnssrv+_grpc._tcp.thanos-receive-ingestor-default.thanos.svc.cluster.local:10901
+  - --query.auto-downsampling
+
+  resources:
+    limits:
+      cpu: 100m
+      memory: 100Mi
+    requests:
+      cpu: 50m
+      memory: 50Mi
+
+  autoscaling:
+    enabled: true
+    maxPods: 10
+    minPods: 3 
+
+  ingress:
+    enabled: false
+    ingressClass: nginx
+    host: thanos-query.unofficial-thanos.io
+    annotations:
+      nginx.ingress.kubernetes.io/load-balance: "ewma"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    pathType: ImplementationSpecific
+  
+#--------------------------------#
+queryfrontend:
+  enabled: false
+
+  replicas: 3
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node
+                operator: In
+                values:
+                  - monitoring
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: node
+                operator: In
+                values:
+                  - monitoring
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - thanos-system-query_frontend
+          namespaces:
+          - monitoring
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+
+  topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/component: thanos-query_frontend
+    # matchLabelKeys is enabled from K8S 1.27    
+    # matchLabelKeys:
+    #   - pod-template-hash
+
+  tolerations:
+  - effect: NoSchedule
+    key: node
+    operator: Equal
+    value: monitoring
+
+  args:
+  - query_frontend
+  - --log.level=info
+  - --log.format=logfmt
+  - --query_frontend.compress-responses
+  - --http-address=0.0.0.0:9090
+  - --query_frontend.downstream-url=http://thanos-query.monitoring:9090
+  - --query-range.split-interval=12h
+  - --labels.split-interval=12h
+  - --query-range.max-retries-per-request=10
+  - --labels.max-retries-per-request=10
+  - --query_frontend.log-queries-longer-than=10s
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+#--------------------------------#
+compactor:
+  enabled: true
+
+  replicas: 1
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node
+                operator: In
+                values:
+                  - monitoring
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: node
+                operator: In
+                values:
+                  - monitoring
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - thanos-compactor
+            namespaces:
+              - monitoring
+            topologyKey: kubernetes.io/hostname
+          weight: 100
+
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: thanos-compactor
+
+  tolerations:
+    - effect: NoSchedule
+      key: node
+      operator: Equal
+      value: monitoring
+
+  args:
+  - compact
+  - --wait
+  - --log.level=info
+  - --log.format=logfmt
+  - --objstore.config=$(OBJSTORE_CONFIG)
+  - --data-dir=/var/thanos/compact
+  - --debug.accept-malformed-index
+  - "--retention.resolution-raw=7d"
+  - "--retention.resolution-5m=30d"
+  - "--retention.resolution-1h=400d"
+  - --delete-delay=48h
+  - --compact.concurrency=1
+  - --downsample.concurrency=1
+  - --downsampling.disable
+  - --deduplication.replica-label=prometheus_replica
+  - --deduplication.replica-label=rule_replica
+
+  resources:
+    limits:
+      cpu: "512m"
+      memory: "1024Mi"
+    requests:
+      cpu: "256m"
+      memory: "512Mi"
+
+  storage:
+    storageClass: gp3
+    size: 10Gi
+    accessMode: ReadWriteOnce
+
+#--------------------------------#
+store: 
+  enabled: true
+
+  replicas: 1
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node
+                operator: In
+                values:
+                  - monitoring
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: node
+                operator: In
+                values:
+                  - monitoring
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - thanos-store
+
+            namespaces:
+              - monitoring
+            topologyKey: kubernetes.io/hostname
+          weight: 100
+
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: thanos-store
+
+  tolerations:
+    - effect: NoSchedule
+      key: node
+      operator: Equal
+      value: monitoring
+
+  args:
+  - store
+  - --log.level=info
+  - --log.format=logfmt
+  - --data-dir=/var/thanos/store
+  - --grpc-address=0.0.0.0:10901
+  - --http-address=0.0.0.0:10902
+  - --objstore.config=$(OBJSTORE_CONFIG)
+  - --ignore-deletion-marks-delay=24h
+  - --index-cache-size=40GB
+
+  resources:
+    limits:
+      cpu: "512m"
+      memory: "1024Mi"
+    requests:
+      cpu: "256m"
+      memory: "512Mi"
+
+  storage:
+    storageClass: gp3
+    size: 10Gi
+    accessMode: ReadWriteOnce
+
+  garbageCollector:
+    enabled: true
+    image: sam0392in/thanos-store-gc:0.1
+    env:
+      thanosDataDirectory: /var/thanos/store
+      cleanupFrequency: 1
+      retentionPeriod: 10
