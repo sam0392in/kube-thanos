@@ -39,7 +39,7 @@ spec:
         {{- range $key, $value := .Values.query.args }}
         - {{ $value }}
         {{- end }}
-        - --store=dnssrv+_grpc._tcp.{{- include "thanos.fullname" . }}-store:10901
+        - --endpoint=dnssrv+_grpc._tcp.{{- include "thanos.fullname" . }}-store:10901
         resources:
         {{- .Values.query.resources | toYaml | nindent 10 }}
         name: "{{- include "thanos.fullname" . }}-query"

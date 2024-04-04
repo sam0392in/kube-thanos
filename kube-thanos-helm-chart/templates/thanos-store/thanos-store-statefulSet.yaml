@@ -34,21 +34,6 @@ spec:
       {{- .Values.store.topologySpreadConstraints | toYaml | nindent 8 }}
       {{- end }}
       containers:
-      {{- if .Values.store.garbageCollector.enabled }}
-      - name: thanos-garbage-collector
-        image: {{ .Values.store.garbageCollector.image }}
-        env:
-          - name: THANOS_DATA_DIR
-            value: "{{ .Values.store.garbageCollector.env.thanosDataDirectory }}"
-          - name: CLEANUP_FREQUENCY
-            value: "{{ .Values.store.garbageCollector.env.cleanupFrequency }}"
-          - name: RETENTION_PERIOD
-            value: "{{ .Values.store.garbageCollector.env.retentionPeriod }}"
-        volumeMounts:
-          - mountPath: /var/thanos/store
-            name: data
-            readOnly: false
-      {{- end }}
       - name: "{{- include "thanos.fullname" . }}-store"
         args:
         {{- range $key, $value := .Values.store.args }}

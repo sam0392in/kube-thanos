@@ -74,17 +74,17 @@ query:
   - --log.format=logfmt
   - --query.replica-label=prometheus_replica
   - --query.replica-label=rule_replica
-  - --store=dnssrv+_grpc._tcp.prometheus-svc.monitoring:10901
-  # - --store=dnssrv+_grpc._tcp.thanos-receive-ingestor-default.thanos.svc.cluster.local:10901
+  - --endpoint=dnssrv+_grpc._tcp.prometheus-svc.monitoring:10901
+  # - --endpoint=dnssrv+_grpc._tcp.thanos-receive-ingestor-default.thanos.svc.cluster.local:10901
   - --query.auto-downsampling
 
   resources:
     limits:
-      cpu: 100m
-      memory: 100Mi
+      cpu: 200m
+      memory: 500Mi
     requests:
-      cpu: 50m
-      memory: 50Mi
+      cpu: 100m
+      memory: 250Mi
 
   autoscaling:
     enabled: true
@@ -332,11 +332,3 @@ store:
     storageClass: gp3
     size: 10Gi
     accessMode: ReadWriteOnce
-
-  garbageCollector:
-    enabled: true
-    image: sam0392in/thanos-store-gc:0.1
-    env:
-      thanosDataDirectory: /var/thanos/store
-      cleanupFrequency: 1
-      retentionPeriod: 10

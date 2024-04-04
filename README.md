@@ -13,7 +13,7 @@ https://github.com/thanos-io/kube-thanos/tree/main/examples/all/manifests
 ## Values to adjust before deployment
 1. Prometheus service name in thanos query section of `values.yaml`:
 ```
-- --store=dnssrv+_grpc._tcp.prometheus-svc.monitoring:10901
+- --endpoint=dnssrv+_grpc._tcp.prometheus-svc.monitoring:10901
 ```
 2. S3 bucket name and region in `thanos-s3-config.yaml`.
 
